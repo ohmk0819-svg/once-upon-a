@@ -9,10 +9,10 @@ export class LevelUpScene extends Phaser.Scene {
     super("LevelUpScene");
   }
 
-  create(data: { options: LevelUpOption[]; level: number }): void {
+  create(data: { options: LevelUpOption[]; level: number; title?: string }): void {
     this.options = data.options;
     this.add.rectangle(640, 360, 1280, 720, 0x243a4a, 0.46);
-    this.add.text(640, 92, `Level ${data.level}! Choose a story gift`, {
+    this.add.text(640, 92, data.title ?? `Level ${data.level}! Choose a story gift`, {
       fontFamily: "Verdana, sans-serif",
       fontSize: "34px",
       color: "#ffffff",
@@ -77,7 +77,7 @@ export class LevelUpScene extends Phaser.Scene {
       }).setOrigin(0.5);
     }
 
-    const level = option.type === "heal" ? "Recovery" : `Lv ${option.currentLevel} -> ${option.nextLevel}`;
+    const level = option.type === "heal" ? "Recovery" : option.type === "evolution" ? "EVO" : `Lv ${option.currentLevel} -> ${option.nextLevel}`;
     const levelText = this.add.text(x + 150, y + 182, level, {
       fontFamily: "Verdana, sans-serif",
       fontSize: "17px",
@@ -90,7 +90,7 @@ export class LevelUpScene extends Phaser.Scene {
       align: "center",
       wordWrap: { width: 236 }
     }).setOrigin(0.5, 0);
-    const key = this.add.text(x + 150, y + 322, `Press ${index + 1}`, {
+    const key = this.add.text(x + 150, y + 322, option.type === "evolution" ? `EVO  Press ${index + 1}` : `Press ${index + 1}`, {
       fontFamily: "Verdana, sans-serif",
       fontSize: "18px",
       color: "#ffffff",

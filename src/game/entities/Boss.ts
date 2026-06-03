@@ -14,11 +14,15 @@ export class Boss extends Enemy {
       moveSpeed: data.moveSpeed,
       expDrop: 0,
       behavior: "eliteChase",
-      visualType: "bigCuteWolf"
+      visualType: "bigCuteWolf",
+      color: data.color
     };
     super(scene, x, y, enemyShape, true);
     this.bossDef = data;
     this.setTexture("boss-big-bad-wolf");
+    if (data.color) {
+      this.setTint(data.color);
+    }
     this.setCircle(42);
     this.setScale(1.15);
     this.setDepth(36);

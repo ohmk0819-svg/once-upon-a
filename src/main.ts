@@ -4,6 +4,7 @@ import { BootScene } from "./game/scenes/BootScene";
 import { PreloadScene } from "./game/scenes/PreloadScene";
 import { TitleScene } from "./game/scenes/TitleScene";
 import { CharacterSelectScene } from "./game/scenes/CharacterSelectScene";
+import { StageSelectScene } from "./game/scenes/StageSelectScene";
 import { GameScene } from "./game/scenes/GameScene";
 import { LevelUpScene } from "./game/scenes/LevelUpScene";
 import { ResultScene } from "./game/scenes/ResultScene";
@@ -30,6 +31,7 @@ const config: Phaser.Types.Core.GameConfig = {
     PreloadScene,
     TitleScene,
     CharacterSelectScene,
+    StageSelectScene,
     GameScene,
     LevelUpScene,
     ResultScene

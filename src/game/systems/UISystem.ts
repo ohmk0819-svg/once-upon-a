@@ -4,7 +4,7 @@ import { getWeapon } from "../data/weapons";
 import { Boss } from "../entities/Boss";
 import { Player } from "../entities/Player";
 import { LevelSystem } from "./LevelSystem";
-import { PassiveState, WeaponState } from "../types/gameTypes";
+import { AimMode, PassiveState, StageData, WeaponState } from "../types/gameTypes";
 import { formatTime } from "../utils/math";
 
 export class UISystem {
@@ -26,7 +26,7 @@ export class UISystem {
       stroke: "#ffffff",
       strokeThickness: 4
     }).setDepth(101);
-    this.itemText = scene.add.text(18, 150, "", {
+    this.itemText = scene.add.text(18, 196, "", {
       fontFamily: "Verdana, sans-serif",
       fontSize: "13px",
       color: "#2d4b5b",
@@ -53,18 +53,26 @@ export class UISystem {
     elapsedSeconds: number,
     weaponStates: WeaponState[],
     passiveStates: PassiveState[],
-    boss?: Boss
+    aimMode: AimMode,
+    boss?: Boss,
+    stage?: StageData,
+    devMode = false,
+    bossTimeSeconds = 900
   ): void {
     this.bars.clear();
-    this.drawPanel(10, 10, 356, 126);
-    this.drawBar(24, 42, 215, 16, player.hp / player.stats.maxHp, 0xff6f91, 0xffffff);
-    this.drawBar(24, 70, 215, 12, levelSystem.exp / levelSystem.requiredExp, 0x4dd0e1, 0xffffff);
+    this.drawPanel(10, 10, 470, 172);
+    this.drawBar(24, 82, 215, 16, player.hp / player.stats.maxHp, 0xff6f91, 0xffffff);
+    this.drawBar(24, 110, 215, 12, levelSystem.exp / levelSystem.requiredExp, 0x4dd0e1, 0xffffff);
 
     const dashText = player.dashUnlocked ? `${Math.ceil(player.getDashCooldownRatio(this.scene.time.now) * 6)}s` : "Lv7";
     const ultText = player.getUltimateCooldownRatio(this.scene.time.now) <= 0 ? "Ready" : `${Math.ceil(player.getUltimateCooldownRatio(this.scene.time.now) * 90)}s`;
+    const bossLine = boss && boss.active ? `Boss: ${boss.bossDef.name.en}` : `Boss in ${formatTime(Math.max(0, bossTimeSeconds - elapsedSeconds))}`;
     this.hudText.setText(
-      `HP ${Math.ceil(player.hp)}/${player.stats.maxHp}   Lv ${levelSystem.level}\n` +
+      `Character: ${player.character.name.en}${devMode ? "   DEV MODE" : ""}\n` +
+        `Stage: ${stage?.name.en ?? "Topsy-Turvy Storybook Forest"}\n` +
+        `HP ${Math.ceil(player.hp)}/${player.stats.maxHp}   Lv ${levelSystem.level}\n` +
         `EXP                         Time ${formatTime(elapsedSeconds)}\n` +
+        `Aim: ${aimMode === "auto" ? "Auto" : "Cursor"}   ${bossLine}\n` +
         `Fairy Dash ${dashText}   Ultimate ${ultText}   Regen ${player.stats.hpRegenPerSecond.toFixed(1)}/s`
     );
 
@@ -97,15 +105,23 @@ export class UISystem {
   }
 
   private drawLoadoutSlots(weaponStates: WeaponState[], passiveStates: PassiveState[]): void {
-    const weaponSlots = weaponStates.map((state) => ({ label: getWeapon(state.id).iconKey, level: state.level, color: 0x80deea }));
+    const weaponSlots = weaponStates.map((state) => {
+      const weapon = getWeapon(state.id);
+      return {
+        label: weapon.iconKey,
+        level: state.level,
+        status: weapon.combo ? "Combo" : weapon.evolved ? "EVO" : `Lv.${state.level}`,
+        color: weapon.evolved ? 0xfff176 : weapon.combo ? 0xffab91 : 0x80deea
+      };
+    });
     const passiveSlots = passiveStates.map((state) => ({ label: getPassive(state.id).iconKey, level: state.level, color: 0xffcc80 }));
     const signature = JSON.stringify({ weaponSlots, passiveSlots });
 
-    this.drawPanel(10, 144, 458, 138);
+    this.drawPanel(10, 190, 500, 138);
     this.itemText.setText("Weapons\n\n\nPassives");
 
-    weaponSlots.forEach((slot, index) => this.drawSlotBox(84 + index * 68, 158, slot.color));
-    passiveSlots.forEach((slot, index) => this.drawSlotBox(84 + index * 68, 226, slot.color));
+    weaponSlots.forEach((slot, index) => this.drawSlotBox(84 + index * 68, 204, slot.color));
+    passiveSlots.forEach((slot, index) => this.drawSlotBox(84 + index * 68, 272, slot.color));
 
     if (signature === this.slotSignature) {
       return;
@@ -116,8 +132,8 @@ export class UISystem {
     }
     this.slotLabels = [];
 
-    weaponSlots.forEach((slot, index) => this.createSlotLabel(84 + index * 68, 158, slot.label, slot.level));
-    passiveSlots.forEach((slot, index) => this.createSlotLabel(84 + index * 68, 226, slot.label, slot.level));
+    weaponSlots.forEach((slot, index) => this.createSlotLabel(84 + index * 68, 204, slot.label, slot.status));
+    passiveSlots.forEach((slot, index) => this.createSlotLabel(84 + index * 68, 272, slot.label, `Lv.${slot.level}`));
   }
 
   private drawSlotBox(x: number, y: number, color: number): void {
@@ -127,8 +143,8 @@ export class UISystem {
     this.bars.strokeRoundedRect(x, y, 58, 48, 7);
   }
 
-  private createSlotLabel(x: number, y: number, label: string, level: number): void {
-    const text = this.scene.add.text(x + 29, y + 24, `${label}\nLv.${level}`, {
+  private createSlotLabel(x: number, y: number, label: string, status: string): void {
+    const text = this.scene.add.text(x + 29, y + 24, `${label}\n${status}`, {
       fontFamily: "Verdana, sans-serif",
       fontSize: "11px",
       color: "#2d4b5b",

@@ -6,6 +6,34 @@ import { requiredExpForLevel } from "../utils/balance";
 
 const OPTION_COLORS = [0xfff176, 0x80deea, 0xffab91, 0xce93d8, 0xa5d6a7, 0xffcc80];
 const CHARACTER_PASSIVE_MAX_LEVEL = 3;
+const MAX_COMMON_WEAPONS = 6;
+const MAX_COMMON_PASSIVES = 6;
+const CHARACTER_PASSIVE_OPTIONS: Record<string, { title: string; description: string; iconKey: string; visualType: string }> = {
+  growingWoodenHeart: {
+    title: "Growing Wooden Heart",
+    description: "Pinocchio gains an extra +6% attack speed.",
+    iconKey: "Heart",
+    visualType: "growingWoodenHeart"
+  },
+  honestHands: {
+    title: "Honest Hands",
+    description: "Axe catches grant stronger Honest Hands stacks.",
+    iconKey: "Hands",
+    visualType: "honestHands"
+  },
+  midnightFootwork: {
+    title: "Midnight Footwork",
+    description: "Moving and Fairy Dash boost Glass Shards a little more.",
+    iconKey: "Steps",
+    visualType: "midnightFootwork"
+  },
+  oniIslandBanner: {
+    title: "Oni Island Banner",
+    description: "Companions and temporary allies hit a little harder.",
+    iconKey: "Banner",
+    visualType: "oniIslandBanner"
+  }
+};
 
 interface WeightedOption {
   option: LevelUpOption;
@@ -45,27 +73,26 @@ export class LevelSystem {
     passiveStates: PassiveState[],
     language: "ko" | "en",
     characterBaseWeaponId = "woodenPunch",
-    characterPassiveLevel = 0
+    characterPassiveLevel = 0,
+    characterPassiveId = "growingWoodenHeart"
   ): LevelUpOption[] {
     const candidates: WeightedOption[] = [];
 
     if (characterPassiveLevel < CHARACTER_PASSIVE_MAX_LEVEL) {
+      const passive = CHARACTER_PASSIVE_OPTIONS[characterPassiveId] ?? CHARACTER_PASSIVE_OPTIONS.growingWoodenHeart;
       candidates.push({
         option: this.createOption({
-          id: "growingWoodenHeart",
+          id: characterPassiveId,
           type: "characterPassive",
           category: "character_passive",
-          title: language === "ko" ? "자라는 나무 심장" : "Growing Wooden Heart",
+          title: passive.title,
           itemKind: language === "ko" ? "캐릭터 스킬" : "Character Skill",
-          description:
-            language === "ko"
-              ? "피노키오의 공격속도가 추가로 6% 증가합니다."
-              : "Pinocchio gains an extra +6% attack speed.",
+          description: passive.description,
           currentLevel: characterPassiveLevel,
           nextLevel: characterPassiveLevel + 1,
           maxLevel: CHARACTER_PASSIVE_MAX_LEVEL,
-          iconKey: "Heart",
-          visualType: "growingWoodenHeart"
+          iconKey: passive.iconKey,
+          visualType: passive.visualType
         }),
         weight: 7,
         priority: true
@@ -104,7 +131,17 @@ export class LevelSystem {
       });
     }
 
+    const commonWeaponCount = weaponStates.filter((state) => {
+      const weapon = getWeapon(state.id);
+      return !weapon.isCharacterBase && !weapon.evolved && !weapon.combo;
+    }).length;
     for (const weapon of weapons) {
+      if (weapon.isCharacterBase || weapon.evolved || weapon.combo) {
+        continue;
+      }
+      if (commonWeaponCount >= MAX_COMMON_WEAPONS) {
+        break;
+      }
       if (weaponStates.some((state) => state.id === weapon.id)) {
         continue;
       }
@@ -153,6 +190,9 @@ export class LevelSystem {
     }
 
     for (const passive of passives) {
+      if (passiveStates.length >= MAX_COMMON_PASSIVES) {
+        break;
+      }
       if (passiveStates.some((state) => state.id === passive.id)) {
         continue;
       }

@@ -6,7 +6,8 @@ export class InputSystem {
 
   constructor(scene: Phaser.Scene) {
     this.cursors = scene.input.keyboard!.createCursorKeys();
-    this.keys = scene.input.keyboard!.addKeys("W,A,S,D,SPACE,SHIFT,Q,R,ENTER") as Record<string, Phaser.Input.Keyboard.Key>;
+    this.keys = scene.input.keyboard!.addKeys("W,A,S,D,SPACE,SHIFT,Q,R,ENTER,TAB,C") as Record<string, Phaser.Input.Keyboard.Key>;
+    scene.input.keyboard!.addCapture("TAB");
   }
 
   getMoveVector(): Phaser.Math.Vector2 {
@@ -25,5 +26,9 @@ export class InputSystem {
 
   ultimatePressed(): boolean {
     return Phaser.Input.Keyboard.JustDown(this.keys.Q) || Phaser.Input.Keyboard.JustDown(this.keys.R);
+  }
+
+  aimTogglePressed(): boolean {
+    return Phaser.Input.Keyboard.JustDown(this.keys.TAB) || Phaser.Input.Keyboard.JustDown(this.keys.C);
   }
 }

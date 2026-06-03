@@ -17,7 +17,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private readonly dashCooldownMs = 6000;
 
   constructor(scene: Phaser.Scene, x: number, y: number, character: CharacterData) {
-    super(scene, x, y, "player-pinocchio");
+    super(scene, x, y, Player.textureFor(character.visualType));
     this.character = character;
     this.hp = character.maxHp;
     this.stats = {
@@ -28,9 +28,22 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       critChance: character.critChance,
       critDamage: 2,
       damageReduction: 0,
+      incomingDamageMultiplier: 1,
       expGain: 1,
       cooldownReduction: 0,
-      hpRegenPerSecond: character.hpRegenPerSecond
+      hpRegenPerSecond: character.hpRegenPerSecond,
+      maxHpMultiplier: 1,
+      moveSpeedBonus: 0,
+      evasionChance: 0,
+      luck: 0,
+      currencyGain: 1,
+      healingMultiplier: 1,
+      movingDamageBonus: 0,
+      summonDamageMultiplier: 1,
+      summonAttackSpeedMultiplier: 1,
+      summonDurationMultiplier: 1,
+      temporaryAllyDurationMultiplier: 1,
+      enemySlowAura: 0
     };
     scene.add.existing(this);
     scene.physics.add.existing(this);
@@ -99,7 +112,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     if (time < this.invulnerableUntil || this.isUltimateInvulnerable(time)) {
       return false;
     }
-    const finalDamage = amount * (1 - this.stats.damageReduction);
+    if (Math.random() < this.stats.evasionChance) {
+      this.invulnerableUntil = time + 250;
+      return false;
+    }
+    const finalDamage = amount * this.stats.incomingDamageMultiplier * (1 - this.stats.damageReduction);
     this.hp = Math.max(0, this.hp - finalDamage);
     this.invulnerableUntil = time + 500;
     this.scene.tweens.add({
@@ -113,7 +130,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   heal(amount: number): void {
-    this.hp = Math.min(this.stats.maxHp, this.hp + amount);
+    this.hp = Math.min(this.stats.maxHp, this.hp + amount * this.stats.healingMultiplier);
   }
 
   regenerate(deltaMs: number): void {
@@ -144,5 +161,15 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
   getUltimateCooldownRatio(time: number): number {
     return Math.max(0, Math.min(1, (this.ultimateReadyAt - time) / 90000));
+  }
+
+  private static textureFor(visualType: string): string {
+    const map: Record<string, string> = {
+      roundWoodcutter: "player-woodcutter",
+      brightBlueWoodenDoll: "player-pinocchio",
+      brightCinderella: "player-cinderella",
+      brightMomotaro: "player-momotaro"
+    };
+    return map[visualType] ?? "player-pinocchio";
   }
 }

@@ -14,6 +14,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   maxHp: number;
   isElite: boolean;
   lastHitAt = 0;
+  private readonly baseTint?: number;
 
   constructor(scene: Phaser.Scene, x: number, y: number, data: EnemyData, isElite = false) {
     super(scene, x, y, ENEMY_TEXTURES[data.visualType] ?? "enemy-small-wolf");
@@ -27,6 +28,10 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.setCollideWorldBounds(false);
     this.setCircle(isElite ? 24 : 15);
     this.setScale(isElite ? 1.25 : 1);
+    this.baseTint = data.color;
+    if (this.baseTint) {
+      this.setTint(this.baseTint);
+    }
   }
 
   updateChase(target: Phaser.Math.Vector2, slowFactor = 1): void {
@@ -36,7 +41,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
       return;
     }
     direction.normalize();
-    const behaviorSpeed = this.dataDef.behavior === "slowChase" ? this.dataDef.moveSpeed * 0.82 : this.dataDef.moveSpeed;
+    const behaviorSpeed = this.getBehaviorSpeed();
     this.setVelocity(direction.x * behaviorSpeed * slowFactor, direction.y * behaviorSpeed * slowFactor);
   }
 
@@ -45,9 +50,23 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.setTint(0xffffff);
     this.scene.time.delayedCall(70, () => {
       if (this.active) {
-        this.clearTint();
+        if (this.baseTint) {
+          this.setTint(this.baseTint);
+        } else {
+          this.clearTint();
+        }
       }
     });
     return this.hp <= 0;
+  }
+
+  private getBehaviorSpeed(): number {
+    if (this.dataDef.behavior === "slowChase" || this.dataDef.behavior === "tank" || this.dataDef.behavior === "stationaryShooter") {
+      return this.dataDef.moveSpeed * 0.82;
+    }
+    if (this.dataDef.behavior === "fastChase" || this.dataDef.behavior === "dash") {
+      return this.dataDef.moveSpeed * 1.12;
+    }
+    return this.dataDef.moveSpeed;
   }
 }
