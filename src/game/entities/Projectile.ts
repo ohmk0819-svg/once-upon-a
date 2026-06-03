@@ -21,9 +21,10 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
     homingStrength = 0
   ) {
     super(scene, x, y, texture);
+    const now = (scene as any).getGameplayTime?.() ?? scene.time.now;
     this.damage = damage;
     this.sourceId = sourceId;
-    this.expiresAt = scene.time.now + lifeMs;
+    this.expiresAt = now + lifeMs;
     this.target = target;
     this.homingStrength = homingStrength;
     scene.add.existing(this);

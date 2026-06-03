@@ -1,5 +1,5 @@
 export function requiredExpForLevel(level: number): number {
-  return 10 + level * 5;
+  return Math.floor(10 * Math.pow(1.08, level) + level * 3);
 }
 
 export function calculateDamageWithCrit(

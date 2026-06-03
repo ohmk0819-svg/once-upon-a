@@ -1,5 +1,6 @@
 import Phaser from "phaser";
-import { localization } from "../data/localization";
+import { t } from "../data/localization";
+import { SaveSystem } from "../systems/SaveSystem";
 
 export class TitleScene extends Phaser.Scene {
   constructor() {
@@ -7,28 +8,54 @@ export class TitleScene extends Phaser.Scene {
   }
 
   create(): void {
+    const save = SaveSystem.load();
+    const language = save.settings?.language ?? "en";
     this.cameras.main.setBackgroundColor("#9cefd6");
     this.drawStorybookBackground();
-    this.add.text(640, 210, localization.en.title, {
+    this.add.text(640, 118, t(language, "title"), {
       fontFamily: "Georgia, serif",
       fontSize: "74px",
       color: "#2d4b5b",
       stroke: "#fff7d6",
       strokeThickness: 8
     }).setOrigin(0.5);
-    this.add.text(640, 300, localization.en.subtitle, {
+    this.add.text(640, 194, t(language, "subtitle"), {
       fontFamily: "Verdana, sans-serif",
-      fontSize: "24px",
+      fontSize: "23px",
       color: "#406578"
     }).setOrigin(0.5);
-    this.add.text(640, 420, "Press Enter to Start", {
+    this.add.text(640, 248, `${t(language, "storyShards")}: ${save.currency}`, {
       fontFamily: "Verdana, sans-serif",
-      fontSize: "28px",
+      fontSize: "20px",
       color: "#ffffff",
       stroke: "#4f9cab",
-      strokeThickness: 5
+      strokeThickness: 4
     }).setOrigin(0.5);
-    this.input.keyboard!.once("keydown-ENTER", () => this.scene.start("CharacterSelectScene"));
+
+    const items = [
+      { label: t(language, "play"), scene: "CharacterSelectScene" },
+      { label: t(language, "upgrades"), scene: "UpgradesScene" },
+      { label: t(language, "collection"), scene: "CollectionScene" },
+      { label: t(language, "achievements"), scene: "AchievementsScene" },
+      { label: t(language, "settings"), scene: "SettingsScene" }
+    ];
+    items.forEach((item, index) => this.createMenuButton(640, 326 + index * 62, item.label, () => this.scene.start(item.scene)));
+  }
+
+  private createMenuButton(x: number, y: number, label: string, action: () => void): void {
+    const button = this.add.rectangle(x, y, 320, 48, 0xfffef2, 0.95)
+      .setStrokeStyle(4, 0x6bb7c8)
+      .setInteractive({ useHandCursor: true });
+    this.add.text(x, y, label, {
+      fontFamily: "Verdana, sans-serif",
+      fontSize: "23px",
+      color: "#2d4b5b",
+      stroke: "#ffffff",
+      strokeThickness: 3
+    }).setOrigin(0.5);
+    button.on("pointerover", () => button.setFillStyle(0xfff176, 0.97));
+    button.on("pointerout", () => button.setFillStyle(0xfffef2, 0.95));
+    button.on("pointerdown", action);
   }
 
   private drawStorybookBackground(): void {

@@ -59,7 +59,7 @@ export class WeaponSystem {
       if (state.id === "woodenPunch") {
         this.fireWoodenPunch(state.level, stats);
       } else if (state.id === "oldAxe") {
-        this.fireOldAxe(state.level);
+        this.fireOldAxe(state.level, time);
       } else if (state.id === "glassShards") {
         this.fireGlassShards(state.level);
       } else if (state.id === "peachBlade") {
@@ -99,7 +99,7 @@ export class WeaponSystem {
     }
   }
 
-  onFairyDash(weaponStates: WeaponState[], stats: PlayerStats, x: number, y: number): void {
+  onFairyDash(weaponStates: WeaponState[], stats: PlayerStats, x: number, y: number, time: number): void {
     const boots = weaponStates.find((state) => state.id === "pussInBootsBoots");
     const robe = weaponStates.find((state) => state.id === "fairyRobe");
     if (robe) {
@@ -111,7 +111,7 @@ export class WeaponSystem {
         });
       }
       if (robe.level >= 5) {
-        this.getPlayer().invulnerableUntil = Math.max(this.getPlayer().invulnerableUntil, this.scene.time.now + 420);
+        this.getPlayer().invulnerableUntil = Math.max(this.getPlayer().invulnerableUntil, time + 420);
       }
     }
     if (!boots || boots.level < 4) {
@@ -149,7 +149,7 @@ export class WeaponSystem {
     void stats;
   }
 
-  private fireOldAxe(levelNumber: number): void {
+  private fireOldAxe(levelNumber: number, time: number): void {
     const player = this.getPlayer();
     const level = getWeapon("oldAxe").levels[levelNumber - 1];
     const aim = this.getAimInfo();
@@ -181,7 +181,7 @@ export class WeaponSystem {
         0.015
       )
     );
-    this.scene.time.delayedCall(540, () => this.createAxeRecovery(player, direction.clone(), tier, levelNumber));
+    this.scene.time.delayedCall(540, () => this.createAxeRecovery(player, direction.clone(), tier, levelNumber, time + 540));
   }
 
   private fireGlassShards(levelNumber: number): void {
@@ -475,7 +475,7 @@ export class WeaponSystem {
     this.fireRadialLine(id, color, base - Math.PI / 4, 260, 50, damage);
   }
 
-  private createAxeRecovery(player: Player, direction: Phaser.Math.Vector2, tier: AxeTier, levelNumber: number): void {
+  private createAxeRecovery(player: Player, direction: Phaser.Math.Vector2, tier: AxeTier, levelNumber: number, time: number): void {
     const distance = tier === "golden" ? 230 : tier === "silver" ? 165 : 105;
     const radius = (levelNumber >= 5 ? 42 : 34) + (tier === "old" ? 8 : 0);
     const x = player.x + direction.x * distance + Phaser.Math.Between(-38, 38);
@@ -493,7 +493,7 @@ export class WeaponSystem {
       y,
       radius,
       tier,
-      expiresAt: this.scene.time.now + 2600
+      expiresAt: time + 2600
     });
   }
 

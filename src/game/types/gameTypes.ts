@@ -3,6 +3,7 @@ export type Language = "ko" | "en";
 export type LocalizedText = Record<Language, string>;
 
 export type AimMode = "auto" | "cursor";
+export type GameMode = "story" | "freeSurvival" | "bossPractice";
 
 export type EnemyBehavior =
   | "chase"
@@ -170,7 +171,7 @@ export interface StageTimelineEntry {
 export interface StageData {
   id: string;
   name: LocalizedText;
-  description?: LocalizedText;
+  description: LocalizedText;
   difficulty?: StageDifficulty;
   durationSeconds: number;
   bossTimeSeconds: number;
@@ -229,12 +230,36 @@ export interface SaveData {
   lastCharacterId?: string;
   lastSelectedCharacter?: string;
   aimMode?: AimMode;
+  settings?: GameSettings;
+  metaUpgrades?: Record<string, number>;
+  unlockedCharacters?: string[];
+  unlockedStages?: string[];
+  bossStats?: Record<string, BossRunStats>;
+  survivalRecords?: Record<string, SurvivalRecord>;
+  discoveredCharacters?: string[];
+  discoveredStages?: string[];
+  discoveredBosses?: string[];
+  discoveredEnemies?: string[];
+  unlockedAchievements?: string[];
+  achievementProgress?: Record<string, number>;
+  tutorialSeen?: boolean;
   characterStats?: Record<string, CharacterRunStats>;
   unlockedItems?: string[];
   discoveredWeapons?: string[];
   discoveredPassives?: string[];
   discoveredEvolutions?: string[];
   stageStats?: Record<string, StageRunStats>;
+}
+
+export interface GameSettings {
+  language: Language;
+  masterVolume: number;
+  bgmVolume: number;
+  sfxVolume: number;
+  screenShake: boolean;
+  defaultAimMode: AimMode;
+  damageNumbers: boolean;
+  reducedEffects: boolean;
 }
 
 export interface CharacterRunStats {
@@ -251,6 +276,16 @@ export interface StageRunStats {
   bestCharacterId?: string;
 }
 
+export interface BossRunStats {
+  encounters: number;
+  defeats: number;
+}
+
+export interface SurvivalRecord {
+  bestTime: number;
+  bestCharacterId: string;
+}
+
 export interface PlayerStats {
   maxHp: number;
   moveSpeed: number;
@@ -262,6 +297,8 @@ export interface PlayerStats {
   incomingDamageMultiplier: number;
   expGain: number;
   cooldownReduction: number;
+  dashCooldownReduction: number;
+  pickupRange: number;
   hpRegenPerSecond: number;
   maxHpMultiplier: number;
   moveSpeedBonus: number;

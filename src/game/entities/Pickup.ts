@@ -15,9 +15,10 @@ export class Pickup extends Phaser.Physics.Arcade.Sprite {
 
   updatePickup(player: Player): void {
     const distance = Phaser.Math.Distance.Between(this.x, this.y, player.x, player.y);
-    if (distance < 80) {
+    const pickupRange = player.stats.pickupRange ?? 80;
+    if (distance < pickupRange) {
       const direction = new Phaser.Math.Vector2(player.x - this.x, player.y - this.y).normalize();
-      const speed = Phaser.Math.Linear(160, 520, 1 - distance / 80);
+      const speed = Phaser.Math.Linear(160, 520, 1 - distance / pickupRange);
       this.setVelocity(direction.x * speed, direction.y * speed);
     } else {
       this.setVelocity(0, 0);

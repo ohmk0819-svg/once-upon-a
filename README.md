@@ -34,8 +34,46 @@ Run with `?dev=1`.
 - F6: Grant a passive pack.
 - F7: Prepare and open a character/shared evolution.
 - F8: Prepare and open a combo evolution.
+- U: Ready ultimate instantly.
 - Shift + 1-4: Restart directly into stages 1-4.
 - Dev runs do not write best-time or clear records.
+
+## Phase 2-D Hotfix
+- Fixed stage boss name display
+- Fixed stage description display
+- Added cursor aim line/reticle
+- Added pause menu
+- Added weapon/passive slot count display
+- Improved Fairy Dash locked/unlocked messaging
+- Added boss phase transition alerts
+- Improved character select details
+- Adjusted EXP curve
+- Separated normal ultimate cooldown from Dev Mode testing
+
+## Phase 3 Content
+- Meta upgrade shop
+- Story Shards economy
+- 40 achievements
+- Collection scene
+- Evolution recipe book
+- Character unlocks
+- Stage unlocks
+- Free Survival mode
+- Boss Practice mode
+- Settings scene
+- English/Korean localization expansion
+- First-play tutorial
+- Save data migration
+
+## Settings
+- Language: English / Korean
+- Volume Master / BGM / SFX
+- Screen Shake
+- Aim Mode Default
+- Damage Numbers
+- Reduced Effects
+- Tutorial replay
+- Reset Save Data
 
 ## Phase 2-D Content
 - Stage Select Scene after Character Select.

@@ -1,9 +1,12 @@
 import Phaser from "phaser";
-import { LevelUpOption } from "../types/gameTypes";
+import { t } from "../data/localization";
+import { SaveSystem } from "../systems/SaveSystem";
+import { Language, LevelUpOption } from "../types/gameTypes";
 import { GameScene } from "./GameScene";
 
 export class LevelUpScene extends Phaser.Scene {
   private options: LevelUpOption[] = [];
+  private language: Language = "en";
 
   constructor() {
     super("LevelUpScene");
@@ -11,8 +14,12 @@ export class LevelUpScene extends Phaser.Scene {
 
   create(data: { options: LevelUpOption[]; level: number; title?: string }): void {
     this.options = data.options;
+    this.language = SaveSystem.load().settings?.language ?? "en";
     this.add.rectangle(640, 360, 1280, 720, 0x243a4a, 0.46);
-    this.add.text(640, 92, data.title ?? `Level ${data.level}! Choose a story gift`, {
+    const title = data.title === "Evolution Available!"
+      ? t(this.language, "evolutionAvailable")
+      : data.title ?? `${t(this.language, "level")} ${data.level}! ${t(this.language, "levelChooseGift")}`;
+    this.add.text(640, 92, title, {
       fontFamily: "Verdana, sans-serif",
       fontSize: "34px",
       color: "#ffffff",
@@ -41,7 +48,7 @@ export class LevelUpScene extends Phaser.Scene {
     const hover = this.add.rectangle(x + 150, y + 185, 300, 370, 0xffffff, 0)
       .setStrokeStyle(0, 0xffffff, 0)
       .setDepth(6);
-    const title = this.add.text(x + 150, y + 22, option.title, {
+    this.add.text(x + 150, y + 22, option.title, {
       fontFamily: "Verdana, sans-serif",
       fontSize: "20px",
       color: "#2d4b5b",
@@ -49,7 +56,7 @@ export class LevelUpScene extends Phaser.Scene {
       wordWrap: { width: 250 }
     }).setOrigin(0.5, 0);
 
-    const kind = this.add.text(x + 150, y + 64, option.itemKind, {
+    this.add.text(x + 150, y + 64, option.itemKind, {
       fontFamily: "Verdana, sans-serif",
       fontSize: "13px",
       color: "#ffffff",
@@ -68,7 +75,7 @@ export class LevelUpScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     if (option.isNew || option.isMax) {
-      this.add.text(x + 252, y + 94, option.isNew ? "NEW" : "MAX", {
+      this.add.text(x + 252, y + 94, option.isNew ? t(this.language, "new") : t(this.language, "max"), {
         fontFamily: "Verdana, sans-serif",
         fontSize: "14px",
         color: "#ffffff",
@@ -77,20 +84,20 @@ export class LevelUpScene extends Phaser.Scene {
       }).setOrigin(0.5);
     }
 
-    const level = option.type === "heal" ? "Recovery" : option.type === "evolution" ? "EVO" : `Lv ${option.currentLevel} -> ${option.nextLevel}`;
-    const levelText = this.add.text(x + 150, y + 182, level, {
+    const level = option.type === "heal" ? t(this.language, "recovery") : option.type === "evolution" ? t(this.language, "evo") : `Lv ${option.currentLevel} -> ${option.nextLevel}`;
+    this.add.text(x + 150, y + 182, level, {
       fontFamily: "Verdana, sans-serif",
       fontSize: "17px",
       color: "#4f9cab"
     }).setOrigin(0.5);
-    const desc = this.add.text(x + 150, y + 216, option.description, {
+    this.add.text(x + 150, y + 216, option.description, {
       fontFamily: "Verdana, sans-serif",
       fontSize: "15px",
       color: "#406578",
       align: "center",
       wordWrap: { width: 236 }
     }).setOrigin(0.5, 0);
-    const key = this.add.text(x + 150, y + 322, option.type === "evolution" ? `EVO  Press ${index + 1}` : `Press ${index + 1}`, {
+    this.add.text(x + 150, y + 322, option.type === "evolution" ? `${t(this.language, "evo")}  ${t(this.language, "press")} ${index + 1}` : `${t(this.language, "press")} ${index + 1}`, {
       fontFamily: "Verdana, sans-serif",
       fontSize: "18px",
       color: "#ffffff",
@@ -108,12 +115,6 @@ export class LevelUpScene extends Phaser.Scene {
       icon.setScale(1);
       hover.setStrokeStyle(0, 0xffffff, 0);
     });
-
-    void kind;
-    void title;
-    void levelText;
-    void desc;
-    void key;
   }
 
   private choose(index: number): void {

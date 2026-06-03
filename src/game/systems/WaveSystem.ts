@@ -40,7 +40,7 @@ export class WaveSystem {
       return;
     }
 
-    const now = this.scene.time.now;
+    const now = elapsedSeconds * 1000;
     if (now < this.nextSpawnAt) {
       return;
     }
@@ -63,6 +63,12 @@ export class WaveSystem {
   spawnBossNow(player: { x: number; y: number }, bossId = this.stage.bossId ?? "bigBadWolf"): Boss {
     this.bossSpawned = true;
     return new Boss(this.scene, player.x + 360, player.y - 180, getBoss(bossId));
+  }
+
+  resumeAfterBoss(): void {
+    this.bossSpawned = false;
+    this.densityMultiplier += 0.5;
+    this.nextSpawnAt = 0;
   }
 
   private applyEvent(event: StageTimelineEntry, player: { x: number; y: number }, addEnemy: (enemy: Enemy) => void, addBoss: (boss: Boss) => void): void {

@@ -9,7 +9,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   lastMoveDirection = new Phaser.Math.Vector2(1, 0);
   invulnerableUntil = 0;
   dashReadyAt = 0;
-  ultimateReadyAt = 30000;
+  ultimateReadyAt = 90000;
   ultimateActiveUntil = 0;
   ultimateBuffUntil = 0;
   slowedUntil = 0;
@@ -31,6 +31,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       incomingDamageMultiplier: 1,
       expGain: 1,
       cooldownReduction: 0,
+      dashCooldownReduction: 0,
+      pickupRange: 80,
       hpRegenPerSecond: character.hpRegenPerSecond,
       maxHpMultiplier: 1,
       moveSpeedBonus: 0,
@@ -82,7 +84,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     }
 
     const direction = this.lastMoveDirection.clone().normalize();
-    this.dashReadyAt = time + this.dashCooldownMs;
+    this.dashReadyAt = time + this.getDashCooldownMs();
     this.invulnerableUntil = Math.max(this.invulnerableUntil, time + 250);
     this.setVelocity(direction.x * 720, direction.y * 720);
     this.scene.tweens.add({
@@ -100,12 +102,16 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     if (time < this.ultimateReadyAt) {
       return false;
     }
-    this.ultimateReadyAt = time + 90000;
+    this.ultimateReadyAt = time + this.getUltimateCooldownMs();
     this.invulnerableUntil = Math.max(this.invulnerableUntil, time + 2000);
     this.ultimateActiveUntil = time + 2000;
     this.ultimateBuffUntil = time + 10000;
     this.emit("ultimate", this.x, this.y);
     return true;
+  }
+
+  readyUltimateNow(): void {
+    this.ultimateReadyAt = 0;
   }
 
   takeDamage(amount: number, time: number): boolean {
@@ -156,11 +162,19 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     if (!this.dashUnlocked) {
       return 1;
     }
-    return Math.max(0, Math.min(1, (this.dashReadyAt - time) / this.dashCooldownMs));
+    return Math.max(0, Math.min(1, (this.dashReadyAt - time) / this.getDashCooldownMs()));
   }
 
   getUltimateCooldownRatio(time: number): number {
-    return Math.max(0, Math.min(1, (this.ultimateReadyAt - time) / 90000));
+    return Math.max(0, Math.min(1, (this.ultimateReadyAt - time) / this.getUltimateCooldownMs()));
+  }
+
+  private getDashCooldownMs(): number {
+    return this.dashCooldownMs * (1 - Phaser.Math.Clamp(this.stats.dashCooldownReduction, 0, 0.5));
+  }
+
+  private getUltimateCooldownMs(): number {
+    return 90000 * (1 - Phaser.Math.Clamp(this.stats.cooldownReduction, 0, 0.65));
   }
 
   private static textureFor(visualType: string): string {

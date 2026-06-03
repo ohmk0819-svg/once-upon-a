@@ -24,13 +24,14 @@ export class AreaEffect extends Phaser.GameObjects.Graphics {
     knockback = 0
   ) {
     super(scene);
+    const now = (scene as any).getGameplayTime?.() ?? scene.time.now;
     this.xPos = x;
     this.yPos = y;
     this.radius = radius;
     this.damage = damage;
     this.sourceId = sourceId;
-    this.expiresAt = scene.time.now + durationMs;
-    this.nextTickAt = scene.time.now;
+    this.expiresAt = now + durationMs;
+    this.nextTickAt = now;
     this.tickMs = tickMs;
     this.knockback = knockback;
     scene.add.existing(this);

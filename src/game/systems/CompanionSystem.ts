@@ -65,19 +65,19 @@ export class CompanionSystem {
     this.units = this.units.filter((unit) => unit.sprite.active);
   }
 
-  spawnTemporaryAlly(x: number, y: number): void {
+  spawnTemporaryAlly(x: number, y: number, time: number): void {
     const temporaryCount = this.units.filter((unit) => unit.kind === "ally").length;
     if (temporaryCount >= 8) {
       return;
     }
     const unit = this.addCompanion("ally", Phaser.Math.Between(-90, 90), Phaser.Math.Between(-90, 90));
     unit.sprite.setPosition(x, y);
-    unit.expiresAt = this.scene.time.now + 6000 * this.player.stats.temporaryAllyDurationMultiplier;
+    unit.expiresAt = time + 6000 * this.player.stats.temporaryAllyDurationMultiplier;
   }
 
-  activateExpedition(): void {
+  activateExpedition(time: number): void {
     this.ensureCoreCompanions();
-    this.empowerUntil = this.scene.time.now + 10000;
+    this.empowerUntil = time + 10000;
     for (let i = 0; i < 8; i += 1) {
       this.scene.time.delayedCall(i * 90, () => {
         const angle = i * (Math.PI / 4);

@@ -36,15 +36,15 @@ export class BossPatternSystem {
       return;
     }
     if (pattern === "pawSwipe") {
-      this.pawSwipe(boss, player);
+      this.pawSwipe(time, boss, player);
       return;
     }
     if (pattern === "playfulHowl") {
-      this.playfulHowl(boss, player);
+      this.playfulHowl(time, boss, player);
       return;
     }
     if (pattern === "candyPuddle") {
-      this.candyPuddle(boss, player);
+      this.candyPuddle(time, boss, player);
       return;
     }
     if (pattern === "cookieSummon") {
@@ -52,23 +52,23 @@ export class BossPatternSystem {
       return;
     }
     if (pattern === "ovenPop") {
-      this.multiCircleBurst(boss, player, 0xff8a3d, 5, 84, 10);
+      this.multiCircleBurst(time, boss, player, 0xff8a3d, 5, 84, 10);
       return;
     }
     if (pattern === "clockHands") {
-      this.clockHands(boss, player);
+      this.clockHands(time, boss, player);
       return;
     }
     if (pattern === "glassShards") {
-      this.radialShardWarning(boss, player);
+      this.radialShardWarning(time, boss, player);
       return;
     }
     if (pattern === "clubSlam") {
-      this.clubSlam(boss, player);
+      this.clubSlam(time, boss, player);
       return;
     }
     if (pattern === "oniFireDance") {
-      this.multiCircleBurst(boss, player, 0xff7043, 7, 70, 12);
+      this.multiCircleBurst(time, boss, player, 0xff7043, 7, 70, 12);
     }
   }
 
@@ -87,7 +87,7 @@ export class BossPatternSystem {
         return;
       }
       boss.setVelocity(direction.x * 730, direction.y * 730);
-      this.dashingUntil = this.scene.time.now + 960;
+      this.dashingUntil = time + 760 + 960;
       this.scene.time.delayedCall(360, () => {
         if (boss.active) {
           boss.setVelocity(0, 0);
@@ -95,13 +95,13 @@ export class BossPatternSystem {
       });
       this.scene.time.delayedCall(180, () => {
         if (boss.active && Phaser.Math.Distance.Between(boss.x, boss.y, player.x, player.y) < 92) {
-          this.combat.damagePlayer(player, boss.dataDef.damage + (pattern === "oniRush" ? 16 : 12), time);
+          this.combat.damagePlayer(player, boss.dataDef.damage + (pattern === "oniRush" ? 16 : 12), time + 940);
         }
       });
     });
   }
 
-  private pawSwipe(boss: Boss, player: Player): void {
+  private pawSwipe(time: number, boss: Boss, player: Player): void {
     const direction = new Phaser.Math.Vector2(player.x - boss.x, player.y - boss.y).normalize();
     const angle = direction.angle();
     const warning = this.scene.add.graphics().setDepth(18);
@@ -116,13 +116,13 @@ export class BossPatternSystem {
       }
       const toPlayer = new Phaser.Math.Vector2(player.x - boss.x, player.y - boss.y);
       if (toPlayer.length() < 155 && Math.abs(Phaser.Math.Angle.Wrap(toPlayer.angle() - angle)) < 0.65) {
-        this.combat.damagePlayer(player, boss.dataDef.damage + 8, this.scene.time.now);
+        this.combat.damagePlayer(player, boss.dataDef.damage + 8, time + 600);
       }
       this.flashCircle(boss.x + direction.x * 90, boss.y + direction.y * 90, 56, 0xfff176);
     });
   }
 
-  private playfulHowl(boss: Boss, player: Player): void {
+  private playfulHowl(time: number, boss: Boss, player: Player): void {
     const warning = this.warningCircle(boss.x, boss.y, 190, 0x80deea);
     this.scene.time.delayedCall(800, () => {
       warning.destroy();
@@ -130,13 +130,13 @@ export class BossPatternSystem {
         return;
       }
       if (Phaser.Math.Distance.Between(boss.x, boss.y, player.x, player.y) < 190) {
-        player.applySlow(this.scene.time.now, 2000);
+        player.applySlow(time + 800, 2000);
       }
       this.flashCircle(boss.x, boss.y, 210, 0x80deea);
     });
   }
 
-  private candyPuddle(boss: Boss, player: Player): void {
+  private candyPuddle(time: number, boss: Boss, player: Player): void {
     const x = player.x;
     const y = player.y;
     const warning = this.warningCircle(x, y, 130, 0xf06292);
@@ -144,8 +144,9 @@ export class BossPatternSystem {
       warning.destroy();
       this.flashCircle(x, y, 130, 0xf06292);
       if (Phaser.Math.Distance.Between(x, y, player.x, player.y) < 130) {
-        player.applySlow(this.scene.time.now, 2400);
-        this.combat.damagePlayer(player, boss.dataDef.damage + 6, this.scene.time.now);
+        const hitTime = time + 700;
+        player.applySlow(hitTime, 2400);
+        this.combat.damagePlayer(player, boss.dataDef.damage + 6, hitTime);
       }
     });
   }
@@ -160,7 +161,7 @@ export class BossPatternSystem {
     }
   }
 
-  private clockHands(boss: Boss, player: Player): void {
+  private clockHands(time: number, boss: Boss, player: Player): void {
     const angleToPlayer = Phaser.Math.Angle.Between(boss.x, boss.y, player.x, player.y);
     [angleToPlayer, angleToPlayer + Math.PI / 2].forEach((angle, index) => {
       const warning = this.scene.add.graphics().setDepth(18);
@@ -175,13 +176,13 @@ export class BossPatternSystem {
           new Phaser.Geom.Point(player.x, player.y)
         );
         if (Phaser.Math.Distance.Between(distance.x, distance.y, player.x, player.y) < 42) {
-          this.combat.damagePlayer(player, boss.dataDef.damage + 10, this.scene.time.now);
+          this.combat.damagePlayer(player, boss.dataDef.damage + 10, time + 650 + index * 130);
         }
       });
     });
   }
 
-  private radialShardWarning(boss: Boss, player: Player): void {
+  private radialShardWarning(time: number, boss: Boss, player: Player): void {
     for (let i = 0; i < 8; i += 1) {
       const angle = i * (Math.PI * 2 / 8);
       const x = boss.x + Math.cos(angle) * 170;
@@ -191,24 +192,24 @@ export class BossPatternSystem {
         warning.destroy();
         this.flashCircle(x, y, 64, 0x90caf9);
         if (Phaser.Math.Distance.Between(x, y, player.x, player.y) < 70) {
-          this.combat.damagePlayer(player, boss.dataDef.damage + 8, this.scene.time.now);
+          this.combat.damagePlayer(player, boss.dataDef.damage + 8, time + 720);
         }
       });
     }
   }
 
-  private clubSlam(boss: Boss, player: Player): void {
+  private clubSlam(time: number, boss: Boss, player: Player): void {
     const warning = this.warningCircle(boss.x, boss.y, 180, 0xb388ff);
     this.scene.time.delayedCall(820, () => {
       warning.destroy();
       this.flashCircle(boss.x, boss.y, 210, 0xb388ff);
       if (Phaser.Math.Distance.Between(boss.x, boss.y, player.x, player.y) < 190) {
-        this.combat.damagePlayer(player, boss.dataDef.damage + 18, this.scene.time.now);
+        this.combat.damagePlayer(player, boss.dataDef.damage + 18, time + 820);
       }
     });
   }
 
-  private multiCircleBurst(boss: Boss, player: Player, color: number, count: number, radius: number, bonusDamage: number): void {
+  private multiCircleBurst(time: number, boss: Boss, player: Player, color: number, count: number, radius: number, bonusDamage: number): void {
     for (let i = 0; i < count; i += 1) {
       const angle = i * (Math.PI * 2 / count) + this.patternIndex * 0.18;
       const distance = 110 + (i % 2) * 115;
@@ -219,7 +220,7 @@ export class BossPatternSystem {
         warning.destroy();
         this.flashCircle(x, y, radius, color);
         if (Phaser.Math.Distance.Between(x, y, player.x, player.y) < radius + 12) {
-          this.combat.damagePlayer(player, boss.dataDef.damage + bonusDamage, this.scene.time.now);
+          this.combat.damagePlayer(player, boss.dataDef.damage + bonusDamage, time + 650 + i * 55);
         }
       });
     }

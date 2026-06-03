@@ -5,9 +5,15 @@ import { PreloadScene } from "./game/scenes/PreloadScene";
 import { TitleScene } from "./game/scenes/TitleScene";
 import { CharacterSelectScene } from "./game/scenes/CharacterSelectScene";
 import { StageSelectScene } from "./game/scenes/StageSelectScene";
+import { AchievementsScene } from "./game/scenes/AchievementsScene";
+import { CollectionScene } from "./game/scenes/CollectionScene";
 import { GameScene } from "./game/scenes/GameScene";
 import { LevelUpScene } from "./game/scenes/LevelUpScene";
+import { PauseScene } from "./game/scenes/PauseScene";
 import { ResultScene } from "./game/scenes/ResultScene";
+import { SettingsScene } from "./game/scenes/SettingsScene";
+import { TutorialScene } from "./game/scenes/TutorialScene";
+import { UpgradesScene } from "./game/scenes/UpgradesScene";
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -30,10 +36,16 @@ const config: Phaser.Types.Core.GameConfig = {
     BootScene,
     PreloadScene,
     TitleScene,
+    UpgradesScene,
+    CollectionScene,
+    AchievementsScene,
+    SettingsScene,
     CharacterSelectScene,
     StageSelectScene,
     GameScene,
     LevelUpScene,
+    PauseScene,
+    TutorialScene,
     ResultScene
   ]
 };

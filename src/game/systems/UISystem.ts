@@ -1,10 +1,12 @@
 import Phaser from "phaser";
+import { t } from "../data/localization";
 import { getPassive } from "../data/passives";
 import { getWeapon } from "../data/weapons";
 import { Boss } from "../entities/Boss";
 import { Player } from "../entities/Player";
 import { LevelSystem } from "./LevelSystem";
-import { AimMode, PassiveState, StageData, WeaponState } from "../types/gameTypes";
+import { SaveSystem } from "./SaveSystem";
+import { AimMode, Language, PassiveState, StageData, WeaponState } from "../types/gameTypes";
 import { formatTime } from "../utils/math";
 
 export class UISystem {
@@ -59,27 +61,35 @@ export class UISystem {
     devMode = false,
     bossTimeSeconds = 900
   ): void {
+    const language = SaveSystem.load().settings?.language ?? "en";
+    const gameplayTime = elapsedSeconds * 1000;
     this.bars.clear();
     this.drawPanel(10, 10, 470, 172);
     this.drawBar(24, 82, 215, 16, player.hp / player.stats.maxHp, 0xff6f91, 0xffffff);
     this.drawBar(24, 110, 215, 12, levelSystem.exp / levelSystem.requiredExp, 0x4dd0e1, 0xffffff);
 
-    const dashText = player.dashUnlocked ? `${Math.ceil(player.getDashCooldownRatio(this.scene.time.now) * 6)}s` : "Lv7";
-    const ultText = player.getUltimateCooldownRatio(this.scene.time.now) <= 0 ? "Ready" : `${Math.ceil(player.getUltimateCooldownRatio(this.scene.time.now) * 90)}s`;
-    const bossLine = boss && boss.active ? `Boss: ${boss.bossDef.name.en}` : `Boss in ${formatTime(Math.max(0, bossTimeSeconds - elapsedSeconds))}`;
+    const dashRatio = player.getDashCooldownRatio(gameplayTime);
+    const dashText = !player.dashUnlocked
+      ? `${t(language, "fairyDash")}: ${t(language, "unlocksAt")} Lv7`
+      : dashRatio <= 0
+        ? `${t(language, "fairyDash")} ${t(language, "ready")}`
+        : `${t(language, "fairyDash")} ${Math.ceil(dashRatio * 6)}s`;
+    const ultimateRatio = player.getUltimateCooldownRatio(gameplayTime);
+    const ultText = ultimateRatio <= 0 ? t(language, "ready") : `${Math.ceil(ultimateRatio * 90)}s`;
+    const bossLine = boss && boss.active ? `${t(language, "boss")}: ${boss.bossDef.name[language]}` : `${t(language, "bossIn")} ${formatTime(Math.max(0, bossTimeSeconds - elapsedSeconds))}`;
     this.hudText.setText(
-      `Character: ${player.character.name.en}${devMode ? "   DEV MODE" : ""}\n` +
-        `Stage: ${stage?.name.en ?? "Topsy-Turvy Storybook Forest"}\n` +
-        `HP ${Math.ceil(player.hp)}/${player.stats.maxHp}   Lv ${levelSystem.level}\n` +
-        `EXP                         Time ${formatTime(elapsedSeconds)}\n` +
-        `Aim: ${aimMode === "auto" ? "Auto" : "Cursor"}   ${bossLine}\n` +
-        `Fairy Dash ${dashText}   Ultimate ${ultText}   Regen ${player.stats.hpRegenPerSecond.toFixed(1)}/s`
+      `${t(language, "character")}: ${player.character.name[language]}${devMode ? `   ${t(language, "devMode")}` : ""}\n` +
+        `${t(language, "stage")}: ${stage?.name[language] ?? "Topsy-Turvy Storybook Forest"}\n` +
+        `${t(language, "hp")} ${Math.ceil(player.hp)}/${player.stats.maxHp}   Lv ${levelSystem.level}\n` +
+        `${t(language, "exp")}                         ${t(language, "time")} ${formatTime(elapsedSeconds)}\n` +
+        `${t(language, "aim")}: ${aimMode === "auto" ? t(language, "auto") : t(language, "cursor")}   ${bossLine}\n` +
+        `${dashText}   ${t(language, "ultimateCooldown")} ${ultText}   ${t(language, "regen")} ${player.stats.hpRegenPerSecond.toFixed(1)}/s`
     );
 
-    this.drawLoadoutSlots(weaponStates, passiveStates);
+    this.drawLoadoutSlots(weaponStates, passiveStates, language);
 
     if (boss && boss.active) {
-      this.bossText.setText(`${boss.bossDef.name.en}`);
+      this.bossText.setText(`${boss.bossDef.name[language]}`);
       this.drawPanel(380, 48, 500, 24);
       this.drawBar(394, 56, 472, 10, boss.hp / boss.maxHp, 0xff8a65, 0xffffff);
     } else {
@@ -104,7 +114,7 @@ export class UISystem {
     this.bars.strokeRoundedRect(x, y, width, height, 5);
   }
 
-  private drawLoadoutSlots(weaponStates: WeaponState[], passiveStates: PassiveState[]): void {
+  private drawLoadoutSlots(weaponStates: WeaponState[], passiveStates: PassiveState[], language: Language): void {
     const weaponSlots = weaponStates.map((state) => {
       const weapon = getWeapon(state.id);
       return {
@@ -115,10 +125,12 @@ export class UISystem {
       };
     });
     const passiveSlots = passiveStates.map((state) => ({ label: getPassive(state.id).iconKey, level: state.level, color: 0xffcc80 }));
-    const signature = JSON.stringify({ weaponSlots, passiveSlots });
+    const weaponCountText = `${t(language, "weapons")} ${weaponStates.length}/6${weaponStates.length >= 6 ? ` ${t(language, "max")}` : ""}`;
+    const passiveCountText = `${t(language, "passives")} ${passiveStates.length}/6${passiveStates.length >= 6 ? ` ${t(language, "max")}` : ""}`;
+    const signature = JSON.stringify({ weaponSlots, passiveSlots, weaponCountText, passiveCountText });
 
     this.drawPanel(10, 190, 500, 138);
-    this.itemText.setText("Weapons\n\n\nPassives");
+    this.itemText.setText(`${weaponCountText}\n\n\n${passiveCountText}`);
 
     weaponSlots.forEach((slot, index) => this.drawSlotBox(84 + index * 68, 204, slot.color));
     passiveSlots.forEach((slot, index) => this.drawSlotBox(84 + index * 68, 272, slot.color));

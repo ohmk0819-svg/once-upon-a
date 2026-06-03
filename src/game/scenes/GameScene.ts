@@ -5,7 +5,7 @@ import { evolutions } from "../data/evolutions";
 import { getPassive } from "../data/passives";
 import { passives } from "../data/passives";
 import { getStage, stages } from "../data/stages";
-import { getWeapon } from "../data/weapons";
+import { getWeapon, weapons } from "../data/weapons";
 import { AreaEffect } from "../entities/AreaEffect";
 import { Boss } from "../entities/Boss";
 import { Enemy } from "../entities/Enemy";
@@ -22,7 +22,7 @@ import { SaveSystem } from "../systems/SaveSystem";
 import { UISystem } from "../systems/UISystem";
 import { WaveSystem } from "../systems/WaveSystem";
 import { WeaponSystem } from "../systems/WeaponSystem";
-import { AimMode, LevelUpOption, PassiveState, PlayerStats, StageData, WeaponState } from "../types/gameTypes";
+import { AimMode, GameMode, LevelUpOption, PassiveState, PlayerStats, StageData, WeaponState } from "../types/gameTypes";
 
 export class GameScene extends Phaser.Scene {
   player!: Player;
@@ -39,6 +39,7 @@ export class GameScene extends Phaser.Scene {
   private projectiles: Projectile[] = [];
   private pickups: Pickup[] = [];
   private areaEffects: AreaEffect[] = [];
+  private aimGuide?: Phaser.GameObjects.Graphics;
   private boss?: Boss;
   private weaponStates: WeaponState[] = [];
   private passiveStates: PassiveState[] = [];
@@ -50,23 +51,32 @@ export class GameScene extends Phaser.Scene {
   private aimMode: AimMode = "auto";
   private stage!: StageData;
   private devMode = false;
+  private mode: GameMode = "story";
   private startTime = 0;
+  private pauseStartedAt?: number;
+  private totalPausedMs = 0;
   private kills = 0;
   private levelUpOpen = false;
   private runEnded = false;
   private clearAfterEvolution = false;
+  private bossEnrageAnnounced = false;
+  private dashUnlockAnnounced = false;
 
   constructor() {
     super("GameScene");
   }
 
-  create(data: { characterId?: string; stageId?: string }): void {
+  create(data: { characterId?: string; stageId?: string; mode?: GameMode }): void {
+    this.resetRunState();
     const character = getCharacter(data.characterId ?? "pinocchio");
     SaveSystem.recordCharacterStart(character.id);
-    this.aimMode = SaveSystem.load().aimMode ?? "auto";
+    const save = SaveSystem.load();
+    this.aimMode = save.aimMode ?? save.settings?.defaultAimMode ?? "auto";
     this.devMode = new URLSearchParams(window.location.search).get("dev") === "1";
+    this.mode = data.mode ?? "story";
     this.stage = getStage(data.stageId ?? "topsyTurvyStorybookForest");
-    if (!this.devMode) {
+    SaveSystem.recordDiscovered("stage", this.stage.id);
+    if (!this.devMode && this.mode !== "bossPractice") {
       SaveSystem.recordStageStart(this.stage.id);
     }
     this.physics.world.setBounds(-2200, -2200, 4400, 4400);
@@ -76,6 +86,7 @@ export class GameScene extends Phaser.Scene {
     this.player = new Player(this, 0, 0, character);
     this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
     this.cameras.main.setBounds(-2200, -2200, 4400, 4400);
+    this.aimGuide = this.add.graphics().setDepth(96);
 
     this.weaponStates = [{ id: character.baseWeaponId, level: 1 }];
     this.passiveStates = [];
@@ -105,20 +116,30 @@ export class GameScene extends Phaser.Scene {
     this.bossPatternSystem = new BossPatternSystem(this, this.combat);
     this.ui = new UISystem(this);
     this.startTime = this.time.now;
+    this.player.ultimateReadyAt = this.getGameplayTime() + (this.devMode ? 10000 : 90000);
     this.events.on("boss-spawn-enemy", (enemyId: string, x: number, y: number) => this.enemies.push(new Enemy(this, x, y, getEnemy(enemyId))));
 
     this.player.on("fairy-dash", (x: number, y: number) => {
-      this.weaponSystem.onFairyDash(this.weaponStates, this.player.stats, x, y);
+      this.weaponSystem.onFairyDash(this.weaponStates, this.player.stats, x, y, this.getGameplayTime());
       if (this.player.character.passiveId === "midnightFootwork") {
-        this.cinderellaDashBoostUntil = this.time.now + 2000;
+        this.cinderellaDashBoostUntil = this.getGameplayTime() + 2000;
       }
     });
     this.player.on("axe-recovered", (tier: string) => this.applyAxeRecovery(tier));
     this.player.on("ultimate", (x: number, y: number) => this.createUltimateAura(x, y));
+    this.input.keyboard!.on("keydown-ESC", () => this.openPauseMenu());
     if (this.devMode) {
       this.registerDevKeys();
     }
     this.rebuildPlayerStats();
+    if (this.mode === "bossPractice") {
+      this.setupBossPractice();
+    }
+    if (!this.devMode && !save.tutorialSeen) {
+      this.markGameplayPaused();
+      this.scene.pause("GameScene");
+      this.scene.launch("TutorialScene");
+    }
   }
 
   update(time: number, delta: number): void {
@@ -126,36 +147,41 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    const elapsedSeconds = (time - this.startTime) / 1000;
+    const gameplayTime = this.getGameplayTime(time);
+    const elapsedSeconds = gameplayTime / 1000;
     const moveVector = this.inputSystem.getMoveVector();
-    this.rebuildPlayerStats(time, moveVector.lengthSq() > 0);
-    this.player.move(moveVector, time);
+    this.rebuildPlayerStats(gameplayTime, moveVector.lengthSq() > 0);
+    this.player.move(moveVector, gameplayTime);
     if (this.inputSystem.dashPressed()) {
-      this.player.tryDash(time);
+      this.player.tryDash(gameplayTime);
     }
     if (this.inputSystem.ultimatePressed()) {
-      if (this.player.tryUltimate(time)) {
+      if (this.player.tryUltimate(gameplayTime)) {
         this.triggerCharacterUltimate();
       }
     }
     if (this.inputSystem.aimTogglePressed()) {
       this.toggleAimMode();
     }
-    this.player.updatePlayer(time);
+    this.player.updatePlayer(gameplayTime);
     this.player.regenerate(delta);
 
-    this.waveSystem.update(elapsedSeconds, this.player, (enemy) => this.enemies.push(enemy), (boss) => {
-      this.boss = boss;
-      this.createBossArrival();
-    });
+    if (this.mode !== "bossPractice") {
+      this.waveSystem.update(elapsedSeconds, this.player, (enemy) => this.enemies.push(enemy), (boss) => {
+        this.boss = boss;
+        this.bossEnrageAnnounced = false;
+        this.createBossArrival();
+      });
+    }
 
-    this.updateEnemies(time);
-    this.weaponSystem.update(time, this.weaponStates, this.player.stats);
-    this.updateProjectiles(time);
-    this.updateAreas(time);
+    this.updateEnemies(gameplayTime);
+    this.weaponSystem.update(gameplayTime, this.weaponStates, this.player.stats);
+    this.updateProjectiles(gameplayTime);
+    this.updateAreas(gameplayTime);
     this.updatePickups();
-    this.companionSystem?.update(time);
-    this.bossPatternSystem.update(time, this.boss, this.player);
+    this.companionSystem?.update(gameplayTime);
+    this.bossPatternSystem.update(gameplayTime, this.boss, this.player);
+    this.updateBossEnrageAlert();
     this.ui.update(
       this.player,
       this.levelSystem,
@@ -168,6 +194,7 @@ export class GameScene extends Phaser.Scene {
       this.devMode,
       this.waveSystem.getBossTimeSeconds()
     );
+    this.updateAimGuide();
 
     if (this.player.hp <= 0) {
       this.finishRun(false);
@@ -179,7 +206,7 @@ export class GameScene extends Phaser.Scene {
     if (this.player.character.passiveId !== "midnightFootwork") {
       return 1;
     }
-    return this.time.now < this.cinderellaDashBoostUntil ? 1.2 + this.characterPassiveLevel * 0.06 : 1;
+    return this.getGameplayTime() < this.cinderellaDashBoostUntil ? 1.2 + this.characterPassiveLevel * 0.06 : 1;
   }
 
   chooseLevelUpOption(option: LevelUpOption): void {
@@ -191,10 +218,13 @@ export class GameScene extends Phaser.Scene {
       this.applyEvolution(option.evolutionId);
     } else {
       this.levelSystem.applyOption(option, this.weaponStates, this.passiveStates);
-      SaveSystem.recordDiscovered(option.type === "weapon" ? "weapon" : "passive", option.id);
+      if (!this.devMode && this.mode !== "bossPractice") {
+        SaveSystem.recordDiscovered(option.type === "weapon" ? "weapon" : "passive", option.id);
+      }
     }
     this.rebuildPlayerStats();
     this.levelUpOpen = false;
+    this.markGameplayResumed();
     this.scene.resume("GameScene");
     if (this.clearAfterEvolution) {
       this.clearAfterEvolution = false;
@@ -204,7 +234,7 @@ export class GameScene extends Phaser.Scene {
     this.time.delayedCall(1, () => this.openNextLevelUpIfNeeded());
   }
 
-  private rebuildPlayerStats(time = this.time.now, isMoving = false): void {
+  private rebuildPlayerStats(time = this.getGameplayTime(), isMoving = false): void {
     const character = this.player.character;
     const stats: PlayerStats = {
       maxHp: character.maxHp,
@@ -217,6 +247,8 @@ export class GameScene extends Phaser.Scene {
       incomingDamageMultiplier: 1,
       expGain: 1,
       cooldownReduction: 0,
+      dashCooldownReduction: 0,
+      pickupRange: 80,
       hpRegenPerSecond: character.hpRegenPerSecond,
       maxHpMultiplier: 1,
       moveSpeedBonus: 0,
@@ -246,6 +278,22 @@ export class GameScene extends Phaser.Scene {
     if (character.passiveId === "oniIslandBanner" && this.companionSystem) {
       this.companionSystem.passiveLevel = this.characterPassiveLevel;
     }
+
+    const meta = SaveSystem.load().metaUpgrades ?? {};
+    stats.maxHpMultiplier += (meta.meta_max_hp ?? 0) * 0.06;
+    stats.attackMultiplier += (meta.meta_attack ?? 0) * 0.04;
+    stats.attackSpeed += (meta.meta_attack_speed ?? 0) * 0.035;
+    stats.moveSpeedBonus += (meta.meta_move_speed ?? 0) * 0.035;
+    stats.damageReduction += (meta.meta_defense ?? 0) * 0.025;
+    stats.critChance += (meta.meta_crit_chance ?? 0) * 0.015;
+    stats.critDamage += (meta.meta_crit_damage ?? 0) * 0.06;
+    stats.expGain += (meta.meta_exp_gain ?? 0) * 0.06;
+    stats.pickupRange += (meta.meta_pickup_range ?? 0) * 18;
+    stats.currencyGain += (meta.meta_currency_gain ?? 0) * 0.08;
+    stats.luck += (meta.meta_luck ?? 0) * 0.04;
+    stats.cooldownReduction += (meta.meta_ultimate_charge ?? 0) * 0.05;
+    stats.dashCooldownReduction += (meta.meta_dash_cooldown ?? 0) * 0.04;
+    stats.hpRegenPerSecond += (meta.meta_hp_regen ?? 0) * 0.08;
 
     for (const state of this.passiveStates) {
       const passive = getPassive(state.id);
@@ -284,7 +332,12 @@ export class GameScene extends Phaser.Scene {
     this.player.hp = Math.min(this.player.hp, stats.maxHp);
     this.player.stats = stats;
     this.player.level = this.levelSystem.level;
+    const wasDashUnlocked = this.player.dashUnlocked;
     this.player.dashUnlocked = this.levelSystem.level >= 7;
+    if (!wasDashUnlocked && this.player.dashUnlocked && !this.dashUnlockAnnounced) {
+      this.dashUnlockAnnounced = true;
+      this.showCenterAlert("Fairy Dash Unlocked!\nPress Space or Shift to dash.", 0x80deea);
+    }
   }
 
   private updateEnemies(time: number): void {
@@ -391,6 +444,12 @@ export class GameScene extends Phaser.Scene {
     }
     if (enemy instanceof Boss) {
       enemy.destroy();
+      if (this.mode === "freeSurvival") {
+        this.boss = undefined;
+        this.waveSystem.resumeAfterBoss();
+        this.showCenterAlert("Survival continues!", 0x80deea);
+        return;
+      }
       if (this.openEvolutionChest()) {
         this.clearAfterEvolution = true;
         return;
@@ -401,7 +460,7 @@ export class GameScene extends Phaser.Scene {
 
     this.kills += 1;
     if (this.player.character.passiveId === "oniIslandBanner" && Math.random() < 0.05 + this.characterPassiveLevel * 0.015) {
-      this.companionSystem?.spawnTemporaryAlly(enemy.x, enemy.y);
+      this.companionSystem?.spawnTemporaryAlly(enemy.x, enemy.y, this.getGameplayTime());
     }
     this.pickups.push(new Pickup(this, enemy.x, enemy.y, enemy.dataDef.expDrop));
     if (enemy.isElite) {
@@ -433,14 +492,16 @@ export class GameScene extends Phaser.Scene {
     }
     this.levelUpOpen = true;
     this.rebuildPlayerStats();
+    const language = SaveSystem.load().settings?.language ?? "en";
     const options = this.levelSystem.generateOptions(
       this.weaponStates,
       this.passiveStates,
-      "en",
+      language,
       this.player.character.baseWeaponId,
       this.characterPassiveLevel,
       this.player.character.passiveId
     );
+    this.markGameplayPaused();
     this.scene.pause("GameScene");
     this.scene.launch("LevelUpScene", { options, level: this.levelSystem.level });
   }
@@ -459,7 +520,9 @@ export class GameScene extends Phaser.Scene {
       return false;
     }
     this.levelUpOpen = true;
-    const options = this.evolutionSystem.toOptions(candidates, "en");
+    const language = SaveSystem.load().settings?.language ?? "en";
+    const options = this.evolutionSystem.toOptions(candidates, language);
+    this.markGameplayPaused();
     this.scene.pause("GameScene");
     this.scene.launch("LevelUpScene", { options, level: this.levelSystem.level, title: "Evolution Available!" });
     return true;
@@ -486,8 +549,10 @@ export class GameScene extends Phaser.Scene {
       }
     }
     this.ownedEvolutionIds.push(evolutionId);
-    SaveSystem.recordEvolution(evolutionId);
-    SaveSystem.recordDiscovered("weapon", resultWeaponId);
+    if (!this.devMode && this.mode !== "bossPractice") {
+      SaveSystem.recordEvolution(evolutionId, evolution.type === "special_combo" ? "combo" : "evolution");
+      SaveSystem.recordDiscovered("weapon", resultWeaponId);
+    }
     this.showEvolutionBurst(evolution.name.en);
   }
 
@@ -509,13 +574,13 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.runEnded = true;
-    const survivalTime = (this.time.now - this.startTime) / 1000;
+    const survivalTime = this.getGameplayTime() / 1000;
     const currencyEarned = Math.round(
       (Math.max(1, Math.floor(this.kills / 8)) + (clear ? 25 : 0)) *
         this.player.stats.currencyGain *
         (1 + this.player.stats.luck * 0.25)
     );
-    SaveSystem.recordRun({
+    const runRecord = SaveSystem.recordRun({
       characterId: this.player.character.id,
       stageId: this.stage.id,
       survivalTime,
@@ -524,7 +589,8 @@ export class GameScene extends Phaser.Scene {
       clear,
       bossId: this.boss?.bossDef.id,
       currencyEarned,
-      devMode: this.devMode
+      devMode: this.devMode,
+      mode: this.mode
     });
     this.scene.start("ResultScene", {
       characterId: this.player.character.id,
@@ -534,13 +600,18 @@ export class GameScene extends Phaser.Scene {
       kills: this.kills,
       level: this.levelSystem.level,
       currencyEarned,
-      devMode: this.devMode
+      devMode: this.devMode,
+      mode: this.mode,
+      achievementsUnlocked: runRecord.achievementsUnlocked
     });
   }
 
   private toggleAimMode(): void {
     this.aimMode = this.aimMode === "auto" ? "cursor" : "auto";
     SaveSystem.setAimMode(this.aimMode);
+    if (this.aimMode === "auto") {
+      this.aimGuide?.clear();
+    }
   }
 
   private getBaseAttackAim(): { mode: AimMode; direction: Phaser.Math.Vector2; target?: Enemy } {
@@ -597,7 +668,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.honestHandsStacks = Math.min(5, this.honestHandsStacks + 1);
-    this.honestHandsUntil = this.time.now + 4000;
+    this.honestHandsUntil = this.getGameplayTime() + 4000;
     const color = tier === "golden" ? "#ffd54f" : tier === "silver" ? "#cfd8dc" : "#a1887f";
     const text = this.add.text(this.player.x, this.player.y - 52, `Catch! x${this.honestHandsStacks}`, {
       fontFamily: "Verdana, sans-serif",
@@ -616,7 +687,7 @@ export class GameScene extends Phaser.Scene {
     } else if (ultimateId === "pumpkinCarriageParade") {
       this.castPumpkinCarriageParade();
     } else if (ultimateId === "oniIslandExpedition") {
-      this.companionSystem?.activateExpedition();
+      this.companionSystem?.activateExpedition(this.getGameplayTime());
       this.castPeachBurst();
     }
   }
@@ -783,6 +854,10 @@ export class GameScene extends Phaser.Scene {
   private registerDevKeys(): void {
     this.input.keyboard!.on("keydown-B", () => this.devSpawnBoss());
     this.input.keyboard!.on("keydown-E", () => this.enemies.push(this.waveSystem.spawnEliteNow(this.player)));
+    this.input.keyboard!.on("keydown-U", () => {
+      this.player.readyUltimateNow();
+      this.showDevToast("Ultimate ready");
+    });
     this.input.keyboard!.on("keydown-F5", (event: KeyboardEvent) => {
       event.preventDefault();
       this.devMaxCurrentLoadout();
@@ -813,6 +888,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.boss = this.waveSystem.spawnBossNow(this.player);
+    this.bossEnrageAnnounced = false;
     this.createBossArrival();
   }
 
@@ -894,5 +970,142 @@ export class GameScene extends Phaser.Scene {
       strokeThickness: 5
     }).setOrigin(0.5).setDepth(130);
     this.tweens.add({ targets: text, y: text.y - 38, alpha: 0, duration: 900, onComplete: () => text.destroy() });
+  }
+
+  private updateAimGuide(): void {
+    if (!this.aimGuide) {
+      return;
+    }
+    this.aimGuide.clear();
+    if (this.aimMode !== "cursor" || this.runEnded || this.levelUpOpen) {
+      return;
+    }
+    const direction = this.getCursorDirection();
+    const startX = this.player.x;
+    const startY = this.player.y;
+    const endX = startX + direction.x * 92;
+    const endY = startY + direction.y * 92;
+    this.aimGuide.lineStyle(5, 0x80deea, 0.44);
+    this.aimGuide.lineBetween(startX, startY, endX, endY);
+    this.aimGuide.lineStyle(2, 0xffffff, 0.82);
+    this.aimGuide.strokeCircle(endX, endY, 13);
+    this.aimGuide.fillStyle(0xfff176, 0.72);
+    this.aimGuide.fillCircle(endX, endY, 4);
+  }
+
+  private updateBossEnrageAlert(): void {
+    if (!this.boss?.active || this.bossEnrageAnnounced || this.boss.hp / this.boss.maxHp > 0.5) {
+      return;
+    }
+    this.bossEnrageAnnounced = true;
+    this.showCenterAlert(`${this.boss.bossDef.name.en} speeds up!`, 0xff8a65);
+    this.cameras.main.flash(240, 255, 241, 118, false);
+  }
+
+  private showCenterAlert(message: string, color: number): void {
+    const width = Math.min(780, 340 + message.length * 8);
+    const ribbon = this.add.rectangle(this.player.x, this.player.y - 142, width, 82, color, 0.34)
+      .setStrokeStyle(3, 0xffffff, 0.86)
+      .setDepth(131);
+    const text = this.add.text(this.player.x, this.player.y - 142, message, {
+      fontFamily: "Verdana, sans-serif",
+      fontSize: "28px",
+      color: "#ffffff",
+      align: "center",
+      stroke: "#2d4b5b",
+      strokeThickness: 6
+    }).setOrigin(0.5).setDepth(132);
+    this.tweens.add({
+      targets: [text, ribbon],
+      y: "-=38",
+      alpha: 0,
+      duration: 1450,
+      delay: 650,
+      onComplete: () => {
+        text.destroy();
+        ribbon.destroy();
+      }
+    });
+  }
+
+  private openPauseMenu(): void {
+    if (this.runEnded || this.levelUpOpen) {
+      return;
+    }
+    this.aimGuide?.clear();
+    this.markGameplayPaused();
+    this.scene.pause("GameScene");
+    this.scene.launch("PauseScene", {
+      characterId: this.player.character.id,
+      stageId: this.stage.id,
+      mode: this.mode
+    });
+  }
+
+  private setupBossPractice(): void {
+    this.levelSystem.level = 12;
+    const base = this.weaponStates[0];
+    if (base) {
+      base.level = Math.min(5, getWeapon(base.id).maxLevel);
+    }
+    const commonWeapons = weapons.filter((weapon) => !weapon.isCharacterBase && !weapon.evolved && !weapon.combo).slice(0, 2);
+    for (const weapon of commonWeapons) {
+      if (!this.weaponStates.some((state) => state.id === weapon.id)) {
+        this.weaponStates.push({ id: weapon.id, level: Math.min(3, weapon.maxLevel) });
+      }
+    }
+    for (const passive of passives.slice(0, 2)) {
+      if (!this.passiveStates.some((state) => state.id === passive.id)) {
+        this.passiveStates.push({ id: passive.id, level: Math.min(2, passive.maxLevel) });
+      }
+    }
+    this.player.readyUltimateNow();
+    this.player.dashUnlocked = true;
+    this.rebuildPlayerStats();
+    this.time.delayedCall(900, () => this.devSpawnBoss());
+    this.showCenterAlert("Boss Practice", 0xfff176);
+  }
+
+  private resetRunState(): void {
+    this.enemies = [];
+    this.projectiles = [];
+    this.pickups = [];
+    this.areaEffects = [];
+    this.weaponStates = [];
+    this.passiveStates = [];
+    this.ownedEvolutionIds = [];
+    this.aimGuide?.destroy();
+    this.aimGuide = undefined;
+    this.boss = undefined;
+    this.characterPassiveLevel = 0;
+    this.honestHandsStacks = 0;
+    this.honestHandsUntil = 0;
+    this.cinderellaDashBoostUntil = 0;
+    this.kills = 0;
+    this.levelUpOpen = false;
+    this.runEnded = false;
+    this.clearAfterEvolution = false;
+    this.bossEnrageAnnounced = false;
+    this.dashUnlockAnnounced = false;
+    this.pauseStartedAt = undefined;
+    this.totalPausedMs = 0;
+  }
+
+  public markGameplayPaused(): void {
+    if (this.pauseStartedAt === undefined) {
+      this.pauseStartedAt = this.time.now;
+    }
+  }
+
+  public markGameplayResumed(): void {
+    if (this.pauseStartedAt !== undefined) {
+      this.totalPausedMs += this.time.now - this.pauseStartedAt;
+      this.pauseStartedAt = undefined;
+    }
+  }
+
+  private getGameplayTime(time = this.time.now): number {
+    const activePauseMs = this.pauseStartedAt === undefined ? 0 : time - this.pauseStartedAt;
+    return Math.max(0, time - this.startTime - this.totalPausedMs - activePauseMs);
   }
 }

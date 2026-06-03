@@ -25,7 +25,8 @@ export class CombatSystem {
   }
 
   damageEnemy(enemy: Enemy, baseDamage: number, stats: PlayerStats, knockback = 0, origin?: { x: number; y: number }): boolean {
-    const ultimateMultiplier = (this.scene as any).player?.isUltimateBuffActive?.(this.scene.time.now) ? 1.35 : 1;
+    const gameplayTime = (this.scene as any).getGameplayTime?.() ?? this.scene.time.now;
+    const ultimateMultiplier = (this.scene as any).player?.isUltimateBuffActive?.(gameplayTime) ? 1.35 : 1;
     const result = calculateDamageWithCrit(baseDamage * stats.attackMultiplier * ultimateMultiplier, stats.critChance, stats.critDamage);
     const died = enemy.takeDamage(result.damage);
     new DamageText(this.scene, enemy.x, enemy.y - 20, result.damage, result.isCrit);
